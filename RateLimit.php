@@ -67,7 +67,7 @@ class RateLimit
 
     public function wait(): void
     {
-        $delta = $this->retryAfter->format('U.u') - microtime(true);
+        $delta = intval((float)$this->retryAfter->format('U.u') - microtime(true));
         if ($delta <= 0) {
             return;
         }

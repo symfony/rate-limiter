@@ -76,6 +76,39 @@ class FixedWindowLimiterTest extends TestCase
         $this->assertTrue($rateLimit->isAccepted());
     }
 
+    public function testReserveOutsideWindow()
+    {
+        $limiter = $this->createLimiter();
+
+        // initial reserve
+        $limiter->reserve(10);
+
+        // Reserve the first window and the second window
+        $firstReservation = $limiter->reserve(10);
+        $secondReservation = $limiter->reserve(10);
+
+        $this->assertFalse($firstReservation->getRateLimit()->isAccepted());
+        $this->assertFalse($secondReservation->getRateLimit()->isAccepted());
+        $this->assertEquals(60, ceil($firstReservation->getWaitDuration()));
+        $this->assertEquals(120, ceil($secondReservation->getWaitDuration()));
+    }
+
+    public function testReservePartiallyFilledWindow()
+    {
+        $limiter = $this->createLimiter();
+
+        $limiter->reserve(10);
+        $first = $limiter->reserve(5);
+        $second = $limiter->reserve(3);
+        $third = $limiter->reserve(5);
+
+        $this->assertEquals(60, ceil($first->getWaitDuration()));
+        // 3 more tokens still fit in the second window (5 + 3 = 8 <= 10)
+        $this->assertEquals(60, ceil($second->getWaitDuration()));
+        // these 5 tokens overflow into the third window (8 + 5 = 13 > 10)
+        $this->assertEquals(120, ceil($third->getWaitDuration()));
+    }
+
     public function testWaitIntervalOnConsumeOverLimit()
     {
         $limiter = $this->createLimiter();

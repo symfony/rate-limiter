@@ -65,7 +65,12 @@ final class FixedWindowLimiter implements LimiterInterface
             } elseif ($availableTokens >= $tokens) {
                 $window->add($tokens, $now);
 
-                $reservation = new Reservation($now, new RateLimit($window->getAvailableTokens($now), \DateTimeImmutable::createFromFormat('U', floor($now)), true, $this->limit));
+                $retryAfter = $now;
+                if ($availableTokens === $tokens) {
+                    $retryAfter += $window->calculateTimeForTokens(1, $now);
+                }
+
+                $reservation = new Reservation($now, new RateLimit($window->getAvailableTokens($now), \DateTimeImmutable::createFromFormat('U', floor($retryAfter)), true, $this->limit));
             } else {
                 $waitDuration = $window->calculateTimeForTokens($tokens, $now);
 

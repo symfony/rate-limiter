@@ -59,7 +59,11 @@ final class RateLimiterFactory
     {
         $intervalNormalizer = static function (Options $options, string $interval): \DateInterval {
             try {
-                return (new \DateTimeImmutable())->diff(new \DateTimeImmutable('+'.$interval));
+                // Create DateTimeImmutable from unix timesatmp, so the default timezone is ignored and we don't need to
+                // deal with quirks happening when modifying dates using a timezone with DST.
+                $now = \DateTimeImmutable::createFromFormat('U', time());
+
+                return $now->diff($now->modify('+'.$interval));
             } catch (\Exception $e) {
                 if (!preg_match('/Failed to parse time string \(\+([^)]+)\)/', $e->getMessage(), $m)) {
                     throw $e;

@@ -1,6 +1,11 @@
 CHANGELOG
 =========
 
+7.3
+---
+
+ * Add `RateLimiterFactoryInterface`
+
 6.4
 ---
 

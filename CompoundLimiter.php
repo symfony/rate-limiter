@@ -26,7 +26,7 @@ final class CompoundLimiter implements LimiterInterface
     public function __construct(array $limiters)
     {
         if (!$limiters) {
-            throw new \LogicException(sprintf('"%s::%s()" require at least one limiter.', self::class, __METHOD__));
+            throw new \LogicException(\sprintf('"%s::%s()" require at least one limiter.', self::class, __METHOD__));
         }
         $this->limiters = $limiters;
     }

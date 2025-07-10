@@ -30,7 +30,7 @@ final class SlidingWindow implements LimiterStateInterface
     public function __construct(string $id, int $intervalInSeconds)
     {
         if ($intervalInSeconds < 1) {
-            throw new InvalidIntervalException(sprintf('The interval must be positive integer, "%d" given.', $intervalInSeconds));
+            throw new InvalidIntervalException(\sprintf('The interval must be positive integer, "%d" given.', $intervalInSeconds));
         }
         $this->id = $id;
         $this->intervalInSeconds = $intervalInSeconds;
@@ -91,7 +91,7 @@ final class SlidingWindow implements LimiterStateInterface
     {
         trigger_deprecation('symfony/ratelimiter', '6.4', 'The "%s()" method is deprecated, use "%s::calculateTimeForTokens" instead.', __METHOD__, self::class);
 
-        return \DateTimeImmutable::createFromFormat('U.u', sprintf('%.6F', microtime(true) + $this->calculateTimeForTokens(max(1, $this->getHitCount()), 1)));
+        return \DateTimeImmutable::createFromFormat('U.u', \sprintf('%.6F', microtime(true) + $this->calculateTimeForTokens(max(1, $this->getHitCount()), 1)));
     }
 
     public function calculateTimeForTokens(int $maxSize, int $tokens): float

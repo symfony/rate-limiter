@@ -61,7 +61,7 @@ final class RateLimiterFactory
             $now = \DateTimeImmutable::createFromFormat('U', time());
 
             try {
-                $nowPlusInterval = @$now->modify('+' . $interval);
+                $nowPlusInterval = @$now->modify('+'.$interval);
             } catch (\DateMalformedStringException $e) {
                 throw new \LogicException(\sprintf('Cannot parse interval "%s", please use a valid unit as described on https://php.net/datetime.formats#datetime.formats.relative', $interval), 0, $e);
             }

@@ -212,6 +212,98 @@ class FixedWindowLimiterTest extends TestCase
         }
     }
 
+    public function testCalendarAnchorMonthlyOnTheFifth()
+    {
+        $utc = new \DateTimeZone('UTC');
+        // Anchor on the 5th of the month
+        $anchor = new \DateTimeImmutable('2024-01-05 00:00:00', $utc);
+
+        // Pretend "now" is 2026-05-10 — past the anchor by ~28 months
+        ClockMock::withClockMock((new \DateTimeImmutable('2026-05-10 12:00:00', $utc))->getTimestamp());
+
+        $limiter = new FixedWindowLimiter('cal', 3, new \DateInterval('P1M'), $this->storage, null, $anchor);
+
+        $this->assertTrue($limiter->consume()->isAccepted());
+        $this->assertTrue($limiter->consume()->isAccepted());
+        $this->assertTrue($limiter->consume()->isAccepted());
+        $rateLimit = $limiter->consume();
+        $this->assertFalse($rateLimit->isAccepted());
+
+        // The retry-after must point to the next 5th (2026-06-05 00:00:00 UTC), not "now + 1 month"
+        $this->assertSame(
+            (new \DateTimeImmutable('2026-06-05 00:00:00', $utc))->getTimestamp(),
+            $rateLimit->getRetryAfter()->getTimestamp()
+        );
+    }
+
+    public function testCalendarAnchorResetsAtPeriodBoundary()
+    {
+        $utc = new \DateTimeZone('UTC');
+        $anchor = new \DateTimeImmutable('2024-01-05 00:00:00', $utc);
+
+        ClockMock::withClockMock((new \DateTimeImmutable('2026-05-10 12:00:00', $utc))->getTimestamp());
+
+        $limiter = new FixedWindowLimiter('cal', 2, new \DateInterval('P1M'), $this->storage, null, $anchor);
+
+        $limiter->consume(2);
+        $this->assertFalse($limiter->consume()->isAccepted());
+
+        // Jump past the next anchor (5th of June)
+        ClockMock::withClockMock((new \DateTimeImmutable('2026-06-05 00:00:01', $utc))->getTimestamp());
+
+        $rateLimit = $limiter->consume();
+        $this->assertTrue($rateLimit->isAccepted());
+        $this->assertSame(1, $rateLimit->getRemainingTokens());
+    }
+
+    public function testCalendarAnchorInTheFuture()
+    {
+        $utc = new \DateTimeZone('UTC');
+        $anchor = new \DateTimeImmutable('2030-01-01 00:00:00', $utc);
+
+        ClockMock::withClockMock((new \DateTimeImmutable('2026-05-10 12:00:00', $utc))->getTimestamp());
+
+        $limiter = new FixedWindowLimiter('cal', 1, new \DateInterval('P1Y'), $this->storage, null, $anchor);
+
+        $limiter->consume();
+        $rateLimit = $limiter->consume();
+        $this->assertFalse($rateLimit->isAccepted());
+
+        // The current period ends at 2027-01-01 (anchor stepped backward by years until containing now)
+        $this->assertSame(
+            (new \DateTimeImmutable('2027-01-01 00:00:00', $utc))->getTimestamp(),
+            $rateLimit->getRetryAfter()->getTimestamp()
+        );
+    }
+
+    public function testCalendarAnchorRejectsSubMonthInterval()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The "anchorAt" option');
+
+        new FixedWindowLimiter('cal', 1, new \DateInterval('PT1M'), $this->storage, null, new \DateTimeImmutable('2024-01-01'));
+    }
+
+    public function testCalendarAnchorRespectsTimezone()
+    {
+        $tz = new \DateTimeZone('America/New_York');
+        $anchor = new \DateTimeImmutable('2024-01-01 00:00:00', $tz);
+
+        // 2026-01-01 00:00:00 New York = 2026-01-01 05:00:00 UTC
+        ClockMock::withClockMock((new \DateTimeImmutable('2026-01-01 04:00:00', new \DateTimeZone('UTC')))->getTimestamp());
+
+        $limiter = new FixedWindowLimiter('cal', 1, new \DateInterval('P1Y'), $this->storage, null, $anchor);
+
+        $limiter->consume();
+        $rateLimit = $limiter->consume();
+
+        // Period is still 2025 (in NY time it's still 2025-12-31 23:00); next reset = 2026-01-01 00:00 NY = 2026-01-01 05:00 UTC
+        $this->assertSame(
+            (new \DateTimeImmutable('2026-01-01 05:00:00', new \DateTimeZone('UTC')))->getTimestamp(),
+            $rateLimit->getRetryAfter()->getTimestamp()
+        );
+    }
+
     public static function provideConsumeOutsideInterval(): \Generator
     {
         yield ['PT15S'];

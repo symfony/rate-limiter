@@ -55,7 +55,7 @@ final class RateLimiterFactory
         };
     }
 
-    protected static function configureOptions(OptionsResolver $options): void
+    private static function configureOptions(OptionsResolver $options): void
     {
         $intervalNormalizer = static function (Options $options, string $interval): \DateInterval {
             // Create DateTimeImmutable from unix timesatmp, so the default timezone is ignored and we don't need to

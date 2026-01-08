@@ -21,17 +21,17 @@ class CompoundRateLimiterFactoryTest extends TestCase
 {
     public function testCreate()
     {
-        $factory1 = $this->createMock(RateLimiterFactoryInterface::class);
+        $factory1 = $this->createStub(RateLimiterFactoryInterface::class);
         $factory1
             ->method('create')
             ->with('foo')
-            ->willReturn($this->createMock(LimiterInterface::class))
+            ->willReturn($this->createStub(LimiterInterface::class))
         ;
-        $factory2 = $this->createMock(RateLimiterFactoryInterface::class);
+        $factory2 = $this->createStub(RateLimiterFactoryInterface::class);
         $factory2
             ->method('create')
             ->with('foo')
-            ->willReturn($this->createMock(LimiterInterface::class))
+            ->willReturn($this->createStub(LimiterInterface::class))
         ;
 
         $compoundFactory = new CompoundRateLimiterFactory([$factory1, $factory2]);

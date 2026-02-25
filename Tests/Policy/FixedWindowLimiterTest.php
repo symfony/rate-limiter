@@ -57,6 +57,21 @@ class FixedWindowLimiterTest extends TestCase
         $this->assertEquals($retryAfter, $rateLimit->getRetryAfter());
     }
 
+    public function testConsumeLastToken()
+    {
+        $now = time();
+        $limiter = $this->createLimiter();
+        $limiter->consume(9);
+
+        $rateLimit = $limiter->consume(1);
+        $this->assertSame(0, $rateLimit->getRemainingTokens());
+        $this->assertTrue($rateLimit->isAccepted());
+        $this->assertEquals(
+            \DateTimeImmutable::createFromFormat('U', $now + 60),
+            $rateLimit->getRetryAfter()
+        );
+    }
+
     #[DataProvider('provideConsumeOutsideInterval')]
     public function testConsumeOutsideInterval(string $dateIntervalString)
     {
@@ -72,6 +87,48 @@ class FixedWindowLimiterTest extends TestCase
         $rateLimit = $limiter->consume(10);
         $this->assertEquals(0, $rateLimit->getRemainingTokens());
         $this->assertTrue($rateLimit->isAccepted());
+    }
+
+    public function testReserveOutsideWindow()
+    {
+        $limiter = $this->createLimiter();
+
+        // initial reserve
+        $limiter->reserve(10);
+
+        // Reserve the first window and the second window
+        $firstReservation = $limiter->reserve(10);
+        $secondReservation = $limiter->reserve(10);
+
+        $this->assertFalse($firstReservation->getRateLimit()->isAccepted());
+        $this->assertFalse($secondReservation->getRateLimit()->isAccepted());
+        $this->assertEquals(60, ceil($firstReservation->getWaitDuration()));
+        $this->assertEquals(120, ceil($secondReservation->getWaitDuration()));
+    }
+
+    public function testReservePartiallyFilledWindow()
+    {
+        $limiter = $this->createLimiter();
+
+        $limiter->reserve(10);
+        $first = $limiter->reserve(5);
+        $second = $limiter->reserve(3);
+        $third = $limiter->reserve(5);
+
+        $this->assertEquals(60, ceil($first->getWaitDuration()));
+        // 3 more tokens still fit in the second window (5 + 3 = 8 <= 10)
+        $this->assertEquals(60, ceil($second->getWaitDuration()));
+        // these 5 tokens overflow into the third window (8 + 5 = 13 > 10)
+        $this->assertEquals(120, ceil($third->getWaitDuration()));
+    }
+
+    public function testReserveExactlyAvailable()
+    {
+        $limiter = $this->createLimiter('PT1S');
+
+        $this->assertEquals(0, $limiter->reserve(5)->getWaitDuration());
+        $this->assertEquals(0, $limiter->reserve(5)->getWaitDuration());
+        $this->assertEquals(1, $limiter->reserve(5)->getWaitDuration());
     }
 
     public function testWaitIntervalOnConsumeOverLimit()

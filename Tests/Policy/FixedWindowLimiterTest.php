@@ -201,6 +201,10 @@ class FixedWindowLimiterTest extends TestCase
     {
         $limiter = $this->createLimiter();
 
+        // negative consume without previous hits should have no effect
+        $rateLimit = $limiter->consume(-1);
+        $this->assertEquals(10, $rateLimit->getRemainingTokens());
+
         $limiter->consume(10);
 
         for ($i = 1; $i <= 3; ++$i) {

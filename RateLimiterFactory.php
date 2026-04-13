@@ -84,13 +84,13 @@ final class RateLimiterFactory
             ->define('limit')->allowedTypes('int')
             ->define('interval')->allowedTypes('string')->normalize($intervalNormalizer)
             ->define('rate')
-                ->default(function (OptionsResolver $rate) use ($intervalNormalizer) {
+                ->default(static function (OptionsResolver $rate) use ($intervalNormalizer) {
                     $rate
                         ->define('amount')->allowedTypes('int')->default(1)
                         ->define('interval')->allowedTypes('string')->normalize($intervalNormalizer)
                     ;
                 })
-                ->normalize(function (Options $options, $value) {
+                ->normalize(static function (Options $options, $value) {
                     if (!isset($value['interval'])) {
                         return null;
                     }

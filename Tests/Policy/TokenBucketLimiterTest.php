@@ -241,6 +241,21 @@ class TokenBucketLimiterTest extends TestCase
         }
     }
 
+    public function testReservationDebtSurvivesCacheExpiration()
+    {
+        $rate = new Rate(\DateInterval::createFromDateString('10 seconds'), 10);
+        $limiter = $this->createLimiter(10, $rate);
+
+        $limiter->consume(10);
+
+        $this->assertEquals(10, $limiter->reserve(1)->getWaitDuration());
+
+        sleep(11);
+
+        $this->assertEquals(0, $limiter->reserve(9)->getWaitDuration());
+        $this->assertEquals(10, $limiter->reserve(1)->getWaitDuration());
+    }
+
     private function createLimiter($initialTokens = 10, ?Rate $rate = null)
     {
         return new TokenBucketLimiter('test', $initialTokens, $rate ?? Rate::perSecond(10), $this->storage);

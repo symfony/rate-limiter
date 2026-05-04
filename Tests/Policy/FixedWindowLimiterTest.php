@@ -33,6 +33,8 @@ class FixedWindowLimiterTest extends TestCase
 
         ClockMock::register(InMemoryStorage::class);
         ClockMock::register(RateLimit::class);
+        ClockMock::register(Window::class);
+        ClockMock::register(FixedWindowLimiter::class);
     }
 
     public function testConsume()
@@ -165,6 +167,95 @@ class FixedWindowLimiterTest extends TestCase
         $window = new Window('id', 300, 100, $serverOneClock);
         $this->assertSame(100, $window->getAvailableTokens($serverTwoClock));
         $this->assertSame(100, $window->getAvailableTokens($serverOneClock));
+    }
+
+    public function testWindowCarriesOverReservedTokensAfterReset()
+    {
+        $now = microtime(true);
+        $window = new Window('id', 10, 10, $now);
+
+        // 15 hits = 5 borrowed from the next window
+        $window->add(15, $now);
+        $this->assertSame(15, $window->getHitCount());
+
+        // After one window has elapsed, the 5-token debt must remain instead of being zeroed out
+        $window->add(0, $now + 11);
+        $this->assertSame(5, $window->getHitCount());
+
+        // A second elapsed window clears the remaining debt
+        $window->add(0, $now + 22);
+        $this->assertSame(0, $window->getHitCount());
+    }
+
+    public function testWindowClearsLargeDebtWhenManyWindowsElapse()
+    {
+        $now = microtime(true);
+        $window = new Window('id', 10, 10, $now);
+
+        // 25 hits = 2 full windows of debt + 5
+        $window->add(25, $now);
+        $this->assertSame(25, $window->getHitCount());
+
+        // 35s later, three windows have elapsed (3 * 10 = 30 tokens recovered)
+        $window->add(0, $now + 35);
+        $this->assertSame(0, $window->getHitCount());
+    }
+
+    public function testWindowAvailableTokensAccountsForCarriedDebt()
+    {
+        $now = microtime(true);
+        $window = new Window('id', 10, 10, $now);
+
+        // 15 hits = 5 borrowed from the next window
+        $window->add(15, $now);
+
+        // Inside the current window, 0 tokens are available
+        $this->assertSame(-5, $window->getAvailableTokens($now));
+
+        // After one window has elapsed, only 5 tokens are free (debt subtracted)
+        $this->assertSame(5, $window->getAvailableTokens($now + 11));
+
+        // After two windows, all 10 tokens are free
+        $this->assertSame(10, $window->getAvailableTokens($now + 22));
+    }
+
+    public function testReservedTokensCarryAcrossWindowBoundaryViaStorage()
+    {
+        $limiter = new FixedWindowLimiter('test', 10, new \DateInterval('PT10S'), $this->storage);
+
+        // Window 1: A consumes 8, B reserves 7 — borrows 5 tokens from window 2
+        $this->assertEqualsWithDelta(0.0, $limiter->reserve(8)->getWaitDuration(), 1.0);
+        $this->assertEqualsWithDelta(10.0, $limiter->reserve(7)->getWaitDuration(), 1.0);
+
+        // Cross the window boundary while staying idle. The storage entry must
+        // outlive the bare interval so the carried 5-token debt persists.
+        sleep(11);
+
+        // Only 5 fresh tokens should be available in window 2 — consuming 6 must throttle
+        $this->assertFalse($limiter->consume(6)->isAccepted());
+
+        // Consuming exactly 5 must succeed and leave the window full
+        $rateLimit = $limiter->consume(5);
+        $this->assertTrue($rateLimit->isAccepted());
+        $this->assertSame(0, $rateLimit->getRemainingTokens());
+    }
+
+    public function testWindowExpirationGrowsWithCarriedDebt()
+    {
+        $now = microtime(true);
+        $window = new Window('id', 10, 10, $now);
+
+        // No hits yet — TTL is one interval, just to cover the current window
+        $this->assertSame(10, $window->getExpirationTime());
+
+        // 15 hits = 5 debt; entry must outlive 1 extra interval to carry it forward
+        $window->add(15, $now);
+        $this->assertSame(20, $window->getExpirationTime());
+
+        // 25 hits = 15 debt; needs 2 extra intervals
+        $window = new Window('id', 10, 10, $now);
+        $window->add(25, $now);
+        $this->assertSame(30, $window->getExpirationTime());
     }
 
     public function testPeekConsume()

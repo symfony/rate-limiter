@@ -31,7 +31,13 @@ final class FixedWindowLimiter implements LimiterInterface
 
     /**
      * @param \DateTimeImmutable|null $anchorAt When set, the window is aligned to a calendar starting at this datetime
-     *                                          and resetting every $interval, instead of starting on the first hit
+     *                                          and resetting every $interval, instead of starting on the first hit.
+     *                                          The anchor's timezone is preserved so period boundaries are DST-correct
+     *                                          (e.g. a midnight anchor in "America/New_York" stays at local midnight
+     *                                          across DST transitions). The anchor may sit in the past or in the future;
+     *                                          the active period is normalized so it contains "now". $interval must be
+     *                                          at least one month when $anchorAt is set; sub-month intervals throw
+     *                                          \InvalidArgumentException.
      */
     public function __construct(
         string $id,

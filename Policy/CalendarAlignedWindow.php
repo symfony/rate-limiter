@@ -52,7 +52,7 @@ final class CalendarAlignedWindow implements LimiterStateInterface
 
     public function add(int $hits = 1, ?float $now = null): void
     {
-        $this->hitCount += $hits;
+        $this->hitCount = max(0, $this->hitCount + $hits);
     }
 
     public function getHitCount(): int

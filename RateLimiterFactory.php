@@ -109,9 +109,10 @@ final class RateLimiterFactory implements RateLimiterFactoryInterface
                         return $value instanceof \DateTimeImmutable ? $value : \DateTimeImmutable::createFromInterface($value);
                     }
                     try {
-                        return new \DateTimeImmutable($value);
+                        // parse as UTC so timezone-less strings produce a stable timestamp across servers
+                        return new \DateTimeImmutable($value, new \DateTimeZone('UTC'));
                     } catch (\Exception $e) {
-                        throw new \LogicException(\sprintf('Cannot parse "anchor_at" value "%s".', $value), 0, $e);
+                        throw new \InvalidArgumentException(\sprintf('Cannot parse "anchor_at" value "%s".', $value), 0, $e);
                     }
                 })
         ;

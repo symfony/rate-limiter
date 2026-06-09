@@ -87,6 +87,10 @@ final class CalendarAlignedWindow implements LimiterStateInterface
 
     public function __unserialize(array $data): void
     {
+        if (($data['i'] ?? null) instanceof \Stringable) {
+            throw new \BadMethodCallException('Cannot unserialize '.self::class);
+        }
+
         $this->id = $data['i'];
         $this->maxSize = $data['m'];
         $this->hitCount = $data['h'];

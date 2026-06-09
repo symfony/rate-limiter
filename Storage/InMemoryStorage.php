@@ -38,7 +38,7 @@ class InMemoryStorage implements StorageInterface
             return null;
         }
 
-        return unserialize($limiterState);
+        return unserialize($limiterState, ['allowed_classes' => true]);
     }
 
     public function delete(string $limiterStateId): void
